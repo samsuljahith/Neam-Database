@@ -51,3 +51,30 @@ class MetadataStore:
             "SELECT DISTINCT collection FROM chunks"
         ).fetchall()
         return [r["collection"] for r in rows]
+
+    def delete_by_source(self, collection: str, source: str) -> list[int]:
+        """Delete chunks by source. Returns deleted vector_ids."""
+        rows = self.conn.execute(
+            "SELECT vector_id FROM chunks WHERE collection=? AND source=?",
+            (collection, source)).fetchall()
+        vector_ids = [r["vector_id"] for r in rows]
+        if vector_ids:
+            self.conn.execute(
+                "DELETE FROM chunks WHERE collection=? AND source=?",
+                (collection, source))
+            self.conn.commit()
+        return vector_ids
+
+    def delete_collection(self, collection: str):
+        """Delete all chunks in a collection."""
+        self.conn.execute(
+            "DELETE FROM chunks WHERE collection=?",
+            (collection,))
+        self.conn.commit()
+
+    def get_all_for_rebuild(self, collection: str) -> list[dict]:
+        """Get all chunks needed to rebuild the FAISS index."""
+        rows = self.conn.execute(
+            "SELECT id, vector_id, text FROM chunks WHERE collection=?",
+            (collection,)).fetchall()
+        return [dict(r) for r in rows]

@@ -1,3 +1,4 @@
+import numpy as np
 from pipeline.chunker import Chunker
 from pipeline.embedder import Embedder
 from pipeline.explainer import Explainer
@@ -52,3 +53,32 @@ class Processor:
 
         results.sort(key=lambda x: x["score"], reverse=True)
         return results
+
+    def delete_source(self, collection: str, source: str) -> dict:
+        """Delete all chunks from a specific source, then rebuild the index."""
+        deleted_ids = self.metadata_store.delete_by_source(collection, source)
+        if not deleted_ids:
+            return {"deleted": 0}
+
+        remaining = self.metadata_store.get_all_for_rebuild(collection)
+        if remaining:
+            texts = [r["text"] for r in remaining]
+            vectors = self.embedder.embed(texts)
+            new_ids = self.vector_store.rebuild(collection, vectors)
+            # Remap SQLite vector_ids to match the new FAISS positions
+            for row, new_id in zip(remaining, new_ids):
+                self.metadata_store.conn.execute(
+                    "UPDATE chunks SET vector_id=? WHERE id=?",
+                    (new_id, row["id"]))
+            self.metadata_store.conn.commit()
+        else:
+            self.vector_store.rebuild(collection, np.empty((0, self.embedder.dimension), dtype=np.float32))
+
+        self.vector_store.save(collection)
+        return {"deleted": len(deleted_ids)}
+
+    def delete_collection(self, collection: str) -> dict:
+        """Delete entire collection from both stores."""
+        self.metadata_store.delete_collection(collection)
+        self.vector_store.delete_collection(collection)
+        return {"message": f"Deleted collection: {collection}"}

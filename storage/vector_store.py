@@ -44,6 +44,22 @@ class VectorStore:
         if os.path.exists(path):
             self.indexes[collection] = faiss.read_index(path)
 
+    def delete_collection(self, name: str):
+        """Remove a collection entirely from memory and disk."""
+        if name not in self.indexes:
+            raise ValueError(f"Collection not found: {name}")
+        del self.indexes[name]
+        path = os.path.join(self.data_dir, f"{name}.index")
+        if os.path.exists(path):
+            os.remove(path)
+
+    def rebuild(self, name: str, vectors: np.ndarray) -> list[int]:
+        """Replace the index with a fresh one from the given vectors."""
+        self.indexes[name] = faiss.IndexFlatIP(settings.embedding_dimension)
+        if len(vectors) > 0:
+            self.indexes[name].add(vectors)
+        return list(range(len(vectors)))
+
     def _get(self, name: str) -> faiss.IndexFlatIP:
         if name not in self.indexes:
             raise ValueError(f"Collection not found: {name}")

@@ -55,5 +55,19 @@ def query(req: QueryRequest):
     except ValueError as e:
         raise HTTPException(404, detail=str(e))
 
+@app.delete("/collections/{name}")
+def delete_collection(name: str):
+    try:
+        return processor.delete_collection(name)
+    except ValueError as e:
+        raise HTTPException(404, detail=str(e))
+
+@app.delete("/documents")
+def delete_document(collection: str, source: str):
+    try:
+        return processor.delete_source(collection, source)
+    except ValueError as e:
+        raise HTTPException(404, detail=str(e))
+
 @app.get("/health")
 def health(): return {"status": "ok"}
