@@ -28,3 +28,11 @@ class QueryResult(BaseModel):
     source: Optional[str] = None
     metadata: Optional[dict] = None
     explanation: Optional[ExplanationResult] = None
+
+class ExplainRequest(BaseModel):
+    query: str
+    text: str
+
+class ExplainResponse(BaseModel):
+    score: float
+    explanation: ExplanationResult
