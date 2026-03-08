@@ -1,9 +1,11 @@
+import json
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
 from models.schemas import IngestRequest
-from pipeline.parser import Parser, UnsupportedFileType
+from pipeline.file_parser import FileParser
 
 router = APIRouter(tags=["ingest"])
-parser = Parser()
+
+file_parser = FileParser()
 
 @router.post("/ingest")
 def ingest(req: IngestRequest, request: Request):
@@ -15,29 +17,42 @@ def ingest(req: IngestRequest, request: Request):
         raise HTTPException(404, detail=str(e))
 
 @router.post("/upload")
-async def upload(
+async def upload_file(
     request: Request,
-    collection: str = Form(...),
     file: UploadFile = File(...),
+    collection: str = Form(...),
+    metadata: str = Form(None),
 ):
+    """Upload a file to be chunked, embedded, and stored."""
     try:
-        data = await file.read()
-        text = parser.parse(data, file.content_type, file.filename)
-    except UnsupportedFileType as e:
-        raise HTTPException(415, detail=str(e))
+        ext = "." + file.filename.rsplit(".", 1)[-1].lower()
+        if ext not in FileParser.SUPPORTED:
+            raise HTTPException(
+                400,
+                detail=f"Unsupported file type: {ext}. "
+                       f"Supported: {', '.join(FileParser.SUPPORTED)}")
 
-    if not text:
-        raise HTTPException(422, detail="File parsed but contained no text.")
+        content = await file.read()
+        text = file_parser.parse(file.filename, content)
 
-    try:
+        meta = json.loads(metadata) if metadata else None
+
         result = request.app.state.processor.ingest(
-            collection, text,
-            source=file.filename)
+            collection=collection,
+            text=text,
+            source=file.filename,
+            metadata=meta)
+
         result["filename"] = file.filename
-        result["parsed_chars"] = len(text)
+        result["text_length"] = len(text)
         return result
+
+    except HTTPException:
+        raise
+    except json.JSONDecodeError:
+        raise HTTPException(400, detail="Invalid metadata JSON")
     except ValueError as e:
-        raise HTTPException(404, detail=str(e))
+        raise HTTPException(400, detail=str(e))
 
 @router.delete("/documents")
 def delete_document(collection: str, source: str, request: Request):
