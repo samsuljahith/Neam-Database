@@ -7,6 +7,8 @@ router = APIRouter(prefix="/collections", tags=["collections"])
 def create_collection(req: CreateCollectionRequest, request: Request):
     try:
         request.app.state.vector_store.create_collection(req.name)
+        if request.app.state.bm25_store:
+            request.app.state.bm25_store.create_collection(req.name)
         return {"message": f"Created: {req.name}"}
     except ValueError as e:
         raise HTTPException(400, detail=str(e))

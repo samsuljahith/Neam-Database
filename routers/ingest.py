@@ -34,7 +34,6 @@ async def upload_file(
 
         content = await file.read()
         text = file_parser.parse(file.filename, content)
-
         meta = json.loads(metadata) if metadata else None
 
         result = request.app.state.processor.ingest(

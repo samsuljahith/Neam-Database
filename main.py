@@ -1,30 +1,39 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pipeline.embedder import Embedder
 from pipeline.processor import Processor
 from storage.vector_store import VectorStore
 from storage.metadata_store import MetadataStore
 from storage.persistence import PersistenceManager
-from routers import collections, ingest, query
+from storage.bm25_store import BM25Store
+from routers import collections, ingest, query, models
 
-app = FastAPI(title="NEAM Vector Database",
-              version="0.1.0")
+app = FastAPI(title="NEAM Vector Database", version="0.2.0")
 
-# Wire components
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 embedder = Embedder()
 vector_store = VectorStore()
 metadata_store = MetadataStore()
-processor = Processor(embedder, vector_store, metadata_store)
+bm25_store = BM25Store()
+processor = Processor(embedder, vector_store, metadata_store, bm25_store)
 persistence = PersistenceManager(vector_store)
 
-# Store on app state for routers
 app.state.processor = processor
 app.state.vector_store = vector_store
 app.state.metadata_store = metadata_store
+app.state.bm25_store = bm25_store
 
-# Register routers
 app.include_router(collections.router)
 app.include_router(ingest.router)
 app.include_router(query.router)
+app.include_router(models.router)
 
 @app.on_event("startup")
 def startup(): persistence.load_all()

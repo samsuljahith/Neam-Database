@@ -14,6 +14,7 @@ class QueryRequest(BaseModel):
     collection: str
     query: str
     top_k: int = 5
+    search_mode: Optional[str] = None  # "vector", "bm25", or "hybrid"
 
 class ExplanationResult(BaseModel):
     confidence: str
@@ -28,6 +29,9 @@ class QueryResult(BaseModel):
     source: Optional[str] = None
     metadata: Optional[dict] = None
     explanation: Optional[ExplanationResult] = None
+    search_mode: Optional[str] = None
+    vector_score: Optional[float] = None
+    bm25_score: Optional[float] = None
 
 class ExplainRequest(BaseModel):
     query: str
